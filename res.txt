@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "habit-tracker",
-    "slug": "habit-tracker",
+    "name": "habits-tracker",
+    "slug": "habits-tracker",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -11,9 +11,6 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
     "ios": {
       "supportsTablet": true
     },
@@ -22,16 +19,15 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.yourname.habittracker",
-      "permissions": ["NOTIFICATIONS"]
+      "package": "com.reedmoor.habitstracker"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [
-      [
-        "expo-notifications"
-      ]
-    ]
+    "extra": {
+      "eas": {
+        "projectId": "d73b443f-cdeb-4d50-9be1-130a9aaaa42c"
+      }
+    }
   }
 }

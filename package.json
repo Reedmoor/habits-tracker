@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~3.2.3",
+    "@react-native-async-storage/async-storage": "1.23.1",
     "@react-native-community/datetimepicker": "^8.2.0",
     "@react-native-community/slider": "^4.5.5",
     "expo": "^51.0.38",
@@ -19,7 +20,8 @@
     "react-native": "0.74.5",
     "react-native-mask-input": "^1.2.3",
     "react-native-web": "~0.19.10",
-    "realm": "^12.13.2"
+    "realm": "^12.13.2",
+    "recharts": "^2.13.3"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0"
