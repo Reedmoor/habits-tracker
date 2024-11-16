@@ -4,6 +4,10 @@ import { Button, SafeAreaView, StyleSheet, Text,
    TextInput, FlatList, View, TouchableOpacity, Modal, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Timer from './Timer';
+import { requestNotificationPermissions, scheduleNotifications, checkScheduledNotifications } 
+from './NotificationsService';
+import { Platform } from 'react-native';
 
 
   // Настройка обработчика уведомлений
@@ -21,8 +25,8 @@ export default function App() {
   const [selectedHabit, setSelectedHabit] = useState(null);
   const [daysOfWeek, setDaysOfWeek] = useState([]);
   const [startTime, setStartTime] = useState('');
-  const [duration, setDuration] = useState('');
-  const [showPicker, setShowPicker] = useState(false);
+  const [showTimer, setShowTimer] = useState(false);
+  const [activeHabit, setActiveHabit] = useState(null);
 // Функция для получения следующей даты для конкретного дня недели
   const getNextDayOccurrence = (dayName) => {
   const days = {
@@ -46,17 +50,7 @@ export default function App() {
 
   // Загрузка данных при запуске приложения
   useEffect(() => {
-    const requestPermissions = async () => {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Предупреждение',
-          'Для работы уведомлений необходимо предоставить разрешение'
-        );
-      }
-    };
-
-    requestPermissions();
+    requestNotificationPermissions();
     loadHabits();
   }, []);
 
@@ -114,6 +108,7 @@ export default function App() {
       id: selectedHabit?.id || Date.now().toString(),
       name: newHabit,
       completed: false,
+      sessions: [],
       schedule: {
         days: daysOfWeek,
         startTime
@@ -164,49 +159,6 @@ export default function App() {
     }
   };
 
-  // Функция для планирования уведомлений
-  const scheduleNotifications = async (habit) => {
-    try {
-      // Отменяем существующие уведомления для этой привычки
-      const existingTriggers = await Notifications.getAllScheduledNotificationsAsync();
-      const habitTriggers = existingTriggers.filter(
-        trigger => trigger.content.data?.habitId === habit.id
-      );
-      
-      for (const trigger of habitTriggers) {
-        await Notifications.cancelScheduledNotificationAsync(trigger.identifier);
-      }
-
-      // Планируем новые уведомления для каждого выбранного дня
-      for (const day of habit.schedule.days) {
-        const [hours, minutes] = habit.schedule.startTime.split(':').map(Number);
-        const nextDate = getNextDayOccurrence(day);
-        nextDate.setHours(hours, minutes, 0, 0);
-
-        // Если время уже прошло сегодня, добавляем 7 дней
-        if (nextDate < new Date()) {
-          nextDate.setDate(nextDate.getDate() + 7);
-        }
-
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: `Время для привычки: ${habit.name}`,
-            body: `Длительность: ${habit.schedule.duration} минут`,
-            data: { habitId: habit.id },
-          },
-          trigger: {
-            date: nextDate,
-            repeats: true,
-            seconds: 60 * 60 * 24 * 7, // Повторять каждые 7 дней
-          },
-        });
-      }
-    } catch (error) {
-      console.error('Error scheduling notifications:', error);
-      Alert.alert('Ошибка', 'Не удалось установить уведомления');
-    }
-  };
-
   const toggleDay = (day) => {
     setDaysOfWeek((prevDays) => 
       prevDays.includes(day) ? prevDays.filter(d => d !== day) : [...prevDays, day]
@@ -217,15 +169,17 @@ export default function App() {
     <View style={styles.habitItem}>
       <Text style={styles.habitText}>{item.name}</Text>
       <View style={styles.habitButtons}>
-        <TouchableOpacity onPress={() => openScheduleModal(item)}>
-          <Text style={styles.scheduleButton}>⚙️</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
+      <TouchableOpacity 
         onPress={() => startTimer(item)}
         style={styles.timerButton}
       >
         <Text style={styles.timerButtonText}>▶</Text>
       </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => openScheduleModal(item)}>
+          <Text style={styles.scheduleButton}>⚙️</Text>
+        </TouchableOpacity>
+        
         <TouchableOpacity 
           onPress={() => deleteHabit(item.id)}
           style={styles.deleteButton}
@@ -236,42 +190,25 @@ export default function App() {
     </View>
   );
   
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [timerDuration, setTimerDuration] = useState(0);
 
-  const startTimer = async (habit) => {
-    setIsTimerRunning(true);
-    setTimerDuration(0);
-    
-    const intervalId = setInterval(() => {
-      setTimerDuration(prevDuration => prevDuration + 1);
-    }, 1000);
-  
-    const result = await new Promise((resolve) => {
-      Alert.alert(
-        'Таймер',
-        `Таймер для привычки "${habit.name}" начат`,
-        [
-          {
-            text: 'Остановить',
-            onPress: () => {
-              clearInterval(intervalId);
-              setIsTimerRunning(false);
-              
-              // Сохранить длительность в объекте привычки
-              const updatedHabits = habits.map(h =>
-                h.id === habit.id
-                  ? { ...h, schedule: { ...h.schedule, duration: timerDuration } }
-                  : h
-              );
-              setHabits(updatedHabits);
-              saveHabitsToStorage(updatedHabits);
-              resolve();
-            }
-          }
-        ]
-      );
-    });
+  const startTimer = (habit) => {
+    setActiveHabit(habit);
+    setShowTimer(true);
+  };
+
+  const saveTimerSession = async (seconds) => {
+    if (activeHabit) {
+      const updatedHabits = habits.map(h => {
+        if (h.id === activeHabit.id) {
+          const sessions = [...(h.sessions || []), seconds];
+          return { ...h, sessions };
+        }
+        return h;
+      });
+      
+      await saveHabitsToStorage(updatedHabits);
+      setHabits(updatedHabits);
+    }
   };
 
   return (
@@ -279,6 +216,11 @@ export default function App() {
       <Text style={styles.title}>Трекер привычек</Text>
 
       <Button title="Добавить привычку" onPress={() => openScheduleModal()} />
+      <Button 
+        title="Проверить уведомления" 
+        onPress={checkScheduledNotifications}
+        style={{ marginTop: 10 }} 
+      />
       <FlatList
         data={habits}
         keyExtractor={(item) => item.id}
@@ -325,14 +267,6 @@ export default function App() {
             onChangeText={setStartTime}
           />
           
-          <Text style={styles.label}>Продолжительность (минуты):</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Введите продолжительность"
-            keyboardType="numeric"
-            value={duration}
-            onChangeText={setDuration}
-          />
 
           <Button title="Сохранить расписание" onPress={saveSchedule} />
           <Button title="Отмена" color="red" onPress={() => {
@@ -341,12 +275,19 @@ export default function App() {
             setSelectedHabit(null);
             setDaysOfWeek([]);
             setStartTime('');
-            setDuration('');
           }} />
         </View>
       </Modal>
 
       <StatusBar style="auto" />
+
+      <Timer
+        visible={showTimer}
+        onClose={() => setShowTimer(false)}
+        habit={activeHabit}
+        onSaveSession={saveTimerSession}
+        sessions={activeHabit?.sessions || []}
+      />
     </SafeAreaView>
   );
 }
@@ -369,6 +310,10 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
     borderRadius: 5,
+    fontSize: 16,
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto', // Системный шрифт с поддержкой кириллицы
+    textAlignVertical: 'center',
+    minHeight: 40,
   },
   habitItem: {
     flexDirection: 'row',
@@ -384,9 +329,15 @@ const styles = StyleSheet.create({
   habitText: {
     fontSize: 18,
   },
+  timerButton: {
+    fontSize: 10,
+    marginRight: 15,
+    backgroundColor: 'lightgreen',
+    padding: 2,
+    borderRadius: 3
+  },
   scheduleButton: {
-    fontSize: 18,
-    marginRight: 10,
+    fontSize: 18
   },
   deleteButton: {
     marginLeft: 10,
@@ -426,5 +377,9 @@ const styles = StyleSheet.create({
   dayText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  buttonContainer: {
+    gap: 10,
+    marginBottom: 20,
   },
 });
