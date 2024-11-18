@@ -5,9 +5,11 @@ import { Button, SafeAreaView, StyleSheet, Text,
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Timer from './Timer';
-import { requestNotificationPermissions, scheduleNotifications, checkScheduledNotifications } 
-from './NotificationsService';
-import { Platform } from 'react-native';
+import { requestNotificationPermissions,
+  scheduleNotifications,
+  checkScheduledNotifications,
+  sendTestNotification } 
+from './NotificationServices';
 
 
   // Настройка обработчика уведомлений
@@ -25,6 +27,7 @@ export default function App() {
   const [selectedHabit, setSelectedHabit] = useState(null);
   const [daysOfWeek, setDaysOfWeek] = useState([]);
   const [startTime, setStartTime] = useState('');
+  const [showPicker, setShowPicker] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
   const [activeHabit, setActiveHabit] = useState(null);
 // Функция для получения следующей даты для конкретного дня недели
@@ -52,6 +55,23 @@ export default function App() {
   useEffect(() => {
     requestNotificationPermissions();
     loadHabits();
+  }, []);
+
+  useEffect(() => {
+    // Настройка обработчика уведомлений в фоновом режиме
+    const backgroundSubscription = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('Background notification handled:', response);
+    });
+  
+    // Настройка обработчика уведомлений в активном режиме
+    const foregroundSubscription = Notifications.addNotificationReceivedListener(notification => {
+      console.log('Foreground notification received:', notification);
+    });
+  
+    return () => {
+      backgroundSubscription.remove();
+      foregroundSubscription.remove();
+    };
   }, []);
 
   // Функция загрузки привычек из хранилища
@@ -310,10 +330,6 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
     borderRadius: 5,
-    fontSize: 16,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto', // Системный шрифт с поддержкой кириллицы
-    textAlignVertical: 'center',
-    minHeight: 40,
   },
   habitItem: {
     flexDirection: 'row',

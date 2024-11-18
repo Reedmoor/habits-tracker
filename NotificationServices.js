@@ -1,7 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Alert } from 'react-native';
 
-
 // Настройка обработчика уведомлений
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -66,6 +65,11 @@ export const scheduleNotifications = async (habit) => {
       return false;
     }
 
+    const hasPermission = await requestNotificationPermissions();
+    if (!hasPermission) {
+      return false;
+    }
+
     // Отменяем существующие уведомления для этой привычки
     const existingTriggers = await Notifications.getAllScheduledNotificationsAsync();
     const habitTriggers = existingTriggers.filter(
@@ -101,29 +105,37 @@ export const scheduleNotifications = async (habit) => {
       }
 
       try {
-        const notification = await Notifications.scheduleNotificationAsync({
+        const notificationId = await Notifications.scheduleNotificationAsync({
           content: {
             title: `Время для привычки: ${habit.name}`,
-            body: `Пора приступить к выполнению привычки!`,
-            data: { habitId: habit.id },
+            body: `Пора приступить к выполнению привычки "${habit.name}"!\nЗапланировано на: ${day}, ${habit.schedule.startTime}`,
+            data: { 
+              habitId: habit.id,
+              day: day,
+              time: habit.schedule.startTime
+            },
           },
           trigger: {
+            channelId: 'habits', // Добавляем идентификатор канала
             date: notificationDate,
             repeats: true,
             seconds: 60 * 60 * 24 * 7, // Повторять каждые 7 дней
           },
         });
+
         scheduledNotifications.push({
-          id: notification,
+          id: notificationId,
           date: notificationDate,
           day: day
         });
+
+        console.log(`Scheduled notification for ${habit.name} on ${day} at ${habit.schedule.startTime}, date: ${notificationDate}`);
       } catch (error) {
         console.error('Error scheduling notification for day:', day, error);
       }
     }
 
-    console.log('Scheduled notifications:', scheduledNotifications);
+    console.log('Successfully scheduled notifications:', scheduledNotifications);
     return scheduledNotifications.length > 0;
   } catch (error) {
     console.error('Error scheduling notifications:', error);
@@ -145,36 +157,38 @@ export const checkScheduledNotifications = async () => {
     }
 
     const notificationsList = scheduledNotifications.map(notification => {
-      const date = notification.trigger.date;
-      const formattedDate = date ? new Date(date).toLocaleString('ru-RU', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      }) : 'Дата не указана';
+      const trigger = notification.trigger;
+      let scheduleInfo = '';
 
-      return `${notification.content.title}\nДата: ${formattedDate}`;
+      if (trigger.date) {
+        const date = new Date(trigger.date);
+        const formattedDate = date.toLocaleString('ru-RU', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Europe/Moscow' // Убедитесь, что используется правильный часовой пояс
+        });
+        scheduleInfo = `Следующее уведомление: ${formattedDate}`;
+      }
+
+      const habitInfo = notification.content.data ? 
+        `\nДень недели: ${notification.content.data.day}\nВремя: ${notification.content.data.time}` : '';
+
+      return `${notification.content.title}\n${scheduleInfo}${habitInfo}`;
     });
 
     Alert.alert(
       'Запланированные уведомления',
       `Количество: ${scheduledNotifications.length}\n\n${notificationsList.join('\n\n')}`
     );
+    
+    // Выводим в консоль для отладки
+    console.log('All scheduled notifications:', scheduledNotifications);
   } catch (error) {
     console.error('Error checking notifications:', error);
     Alert.alert('Ошибка', 'Не удалось получить список уведомлений');
-  }
-};
-
-// Вспомогательная функция для отмены всех уведомлений
-export const cancelAllNotifications = async () => {
-  try {
-    await Notifications.cancelAllScheduledNotificationsAsync();
-    Alert.alert('Успешно', 'Все уведомления были отменены');
-  } catch (error) {
-    console.error('Error canceling notifications:', error);
-    Alert.alert('Ошибка', 'Не удалось отменить уведомления');
   }
 };
