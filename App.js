@@ -8,7 +8,7 @@ import Timer from './Timer';
 import { requestNotificationPermissions,
   scheduleNotifications,
   checkScheduledNotifications,
-  sendTestNotification } 
+  setupNotificationListeners }
 from './NotificationServices';
 
 
@@ -53,8 +53,37 @@ export default function App() {
 
   // Загрузка данных при запуске приложения
   useEffect(() => {
-    requestNotificationPermissions();
-    loadHabits();
+    const requestPermissionsAndInitialize = async () => {
+      // Явный запрос разрешений
+      const permissionResult = await requestNotificationPermissions();
+      
+      if (permissionResult) {
+        // Если разрешения получены, загружаем привычки
+        loadHabits();
+      } else {
+        // Если разрешения не получены, показываем предупреждение
+        Alert.alert(
+          'Уведомления', 
+          'Для корректной работы приложения необходимо разрешить уведомления',
+          [
+            {
+              text: 'Открыть настройки',
+              onPress: () => {
+                // Здесь можно добавить логику открытия настроек устройства
+                // Это зависит от платформы (iOS/Android)
+                Linking.openSettings(); // Потребуется импортировать Linking из 'react-native'
+              }
+            },
+            {
+              text: 'Отмена',
+              style: 'cancel'
+            }
+          ]
+        );
+      }
+    };
+  
+    requestPermissionsAndInitialize();
   }, []);
 
   useEffect(() => {
@@ -71,6 +100,34 @@ export default function App() {
     return () => {
       backgroundSubscription.remove();
       foregroundSubscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    // Настраиваем обработчик уведомлений
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+      }),
+    });
+  
+    // Инициализируем разрешения и слушатели
+    const initialize = async () => {
+      await requestNotificationPermissions();
+      loadHabits();
+    };
+  
+    // Устанавливаем слушатели уведомлений
+    const cleanup = setupNotificationListeners();
+  
+    initialize();
+  
+    // Очищаем слушатели при размонтировании
+    return () => {
+      cleanup();
     };
   }, []);
 
@@ -235,12 +292,29 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Трекер привычек</Text>
 
-      <Button title="Добавить привычку" onPress={() => openScheduleModal()} />
-      <Button 
-        title="Проверить уведомления" 
-        onPress={checkScheduledNotifications}
-        style={{ marginTop: 10 }} 
-      />
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity 
+          style={styles.mainButton} 
+          onPress={() => openScheduleModal()}
+        >
+          <Text style={styles.mainButtonText}>Добавить привычку</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.mainButton} 
+          onPress={checkScheduledNotifications}
+        >
+          <Text style={styles.mainButtonText}>Проверить уведомления</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.mainButton} 
+          onPress={requestNotificationPermissions}
+        >
+          <Text style={styles.mainButtonText}>Разрешить уведомления</Text>
+        </TouchableOpacity>
+      </View>
+      
       <FlatList
         data={habits}
         keyExtractor={(item) => item.id}
@@ -315,7 +389,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'lightgray', // Changed to grey background
     padding: 20,
   },
   title: {
@@ -324,12 +398,29 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginVertical: 20,
   },
+  buttonContainer: {
+    gap: 10,
+    marginBottom: 20,
+  },
+  mainButton: {
+    backgroundColor: '#FFA500', // Orange color
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginVertical: 5,
+  },
+  mainButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   input: {
     borderColor: '#ccc',
     borderWidth: 1,
     padding: 10,
     marginBottom: 10,
     borderRadius: 5,
+    backgroundColor: 'white',
   },
   habitItem: {
     flexDirection: 'row',
@@ -337,6 +428,9 @@ const styles = StyleSheet.create({
     padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
+    backgroundColor: 'white',
+    marginVertical: 5,
+    borderRadius: 8,
   },
   habitButtons: {
     flexDirection: 'row',
@@ -348,7 +442,7 @@ const styles = StyleSheet.create({
   timerButton: {
     fontSize: 10,
     marginRight: 15,
-    backgroundColor: 'lightgreen',
+    backgroundColor: 'orange',
     padding: 2,
     borderRadius: 3
   },
@@ -393,9 +487,5 @@ const styles = StyleSheet.create({
   dayText: {
     color: '#fff',
     fontWeight: 'bold',
-  },
-  buttonContainer: {
-    gap: 10,
-    marginBottom: 20,
   },
 });

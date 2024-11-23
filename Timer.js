@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, Dimensions } from 'react-native';
-import Svg, { Path, Line, Text as SvgText, Circle } from 'react-native-svg';
+import Svg, { Path, Line, Text as SvgText, Circle, Rect } from 'react-native-svg';
+
+// Design system colors
+const COLORS = {
+  primary: '#FF9800', // Orange
+  primaryDark: '#F57C00',
+  secondary: '#757575', // Gray
+  secondaryLight: '#BDBDBD',
+  background: '#FFFFFF',
+  text: '#424242',
+  success: '#4CAF50',
+  error: '#f44336',
+  chart: '#FF9800',
+  chartGrid: '#E0E0E0',
+};
 
 const Timer = ({ visible, onClose, habit, onSaveSession, sessions }) => {
   const [seconds, setSeconds] = useState(0);
@@ -59,15 +73,14 @@ const Timer = ({ visible, onClose, habit, onSaveSession, sessions }) => {
   };
 
   const SimpleGraph = () => {
-    const width = Dimensions.get('window').width * 0.8;
-    const height = 200;
+    const width = Dimensions.get('window').width * 0.85;
+    const height = 250;
     const padding = 40;
     const graphWidth = width - (padding * 2);
     const graphHeight = height - (padding * 2);
 
-    // Если сессия только одна, создаем фиктивную точку для масштабирования
     const normalizedSessions = sessions.length === 1 
-      ? [...sessions, sessions[0]] // Дублируем единственную сессию
+      ? [...sessions, sessions[0]]
       : sessions;
 
     const maxDuration = Math.max(...normalizedSessions.map(s => s / 60));
@@ -78,7 +91,6 @@ const Timer = ({ visible, onClose, habit, onSaveSession, sessions }) => {
       return { x, y, duration: session };
     });
 
-    // Создаем path только если у нас больше одной реальной точки
     const pathData = sessions.length > 1 
       ? points.map((point, index) => 
           `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`
@@ -88,14 +100,28 @@ const Timer = ({ visible, onClose, habit, onSaveSession, sessions }) => {
     return (
       <View style={styles.graphContainer}>
         <Svg height={height} width={width}>
-          {/* Оси */}
+          {/* Background Grid */}
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Line
+              key={`grid-h-${i}`}
+              x1={padding}
+              y1={padding + (i * (graphHeight / 4))}
+              x2={width - padding}
+              y2={padding + (i * (graphHeight / 4))}
+              stroke={COLORS.chartGrid}
+              strokeWidth="1"
+              strokeDasharray="5,5"
+            />
+          ))}
+
+          {/* Axes */}
           <Line
             x1={padding}
             y1={padding}
             x2={padding}
             y2={height - padding}
-            stroke="black"
-            strokeWidth="1"
+            stroke={COLORS.text}
+            strokeWidth="2"
           />
           
           <Line
@@ -103,57 +129,82 @@ const Timer = ({ visible, onClose, habit, onSaveSession, sessions }) => {
             y1={height - padding}
             x2={width - padding}
             y2={height - padding}
-            stroke="black"
-            strokeWidth="1"
+            stroke={COLORS.text}
+            strokeWidth="2"
           />
 
-          {/* Линия графика (только если больше 1 точки) */}
+          {/* Chart Area Background */}
+          <Rect
+            x={padding}
+            y={padding}
+            width={graphWidth}
+            height={graphHeight}
+            fill="white"
+            opacity={0.5}
+          />
+
+          {/* Line Graph */}
           {sessions.length > 1 && (
-            <Path
-              d={pathData}
-              stroke="#8884d8"
-              strokeWidth="2"
-              fill="none"
-            />
+            <>
+              <Path
+                d={pathData}
+                stroke={COLORS.chart}
+                strokeWidth="3"
+                fill="none"
+              />
+              <Path
+                d={`${pathData} L ${points[points.length-1].x} ${height - padding} L ${points[0].x} ${height - padding} Z`}
+                fill={COLORS.chart}
+                opacity={0.1}
+              />
+            </>
           )}
 
-          {/* Отображаем только реальные точки */}
+          {/* Data Points */}
           {sessions.map((session, index) => (
             <React.Fragment key={index}>
               <Circle
                 cx={points[index].x}
                 cy={points[index].y}
+                r="6"
+                fill={COLORS.chart}
+              />
+              <Circle
+                cx={points[index].x}
+                cy={points[index].y}
                 r="4"
-                fill="#8884d8"
+                fill="white"
               />
               <SvgText
                 x={points[index].x}
-                y={height - padding / 2}
+                y={height - padding + 20}
                 textAnchor="middle"
-                fill="black"
+                fill={COLORS.text}
                 fontSize="12"
               >
                 {index + 1}
               </SvgText>
               <SvgText
                 x={points[index].x}
-                y={points[index].y - 10}
+                y={points[index].y - 15}
                 textAnchor="middle"
-                fill="black"
-                fontSize="10"
+                fill={COLORS.text}
+                fontSize="12"
+                fontWeight="bold"
               >
                 {Math.floor(session / 60)}м
               </SvgText>
             </React.Fragment>
           ))}
 
-          {/* Подписи осей */}
+          {/* Axis Labels */}
           <SvgText
             x={padding / 2}
             y={height / 2}
             textAnchor="middle"
-            fill="black"
-            fontSize="12"
+            fill={COLORS.text}
+            fontSize="14"
+            fontWeight="bold"
             rotation="-90"
           >
             Минуты
@@ -161,16 +212,16 @@ const Timer = ({ visible, onClose, habit, onSaveSession, sessions }) => {
           
           <SvgText
             x={width / 2}
-            y={height - 10}
+            y={height - 5}
             textAnchor="middle"
-            fill="black"
-            fontSize="12"
+            fill={COLORS.text}
+            fontSize="14"
+            fontWeight="bold"
           >
             Сессии
           </SvgText>
         </Svg>
         
-        {/* Информационное сообщение при одной сессии */}
         {sessions.length === 1 && (
           <Text style={styles.singleSessionMessage}>
             Это ваша первая сессия. Продолжайте тренироваться, чтобы увидеть свой прогресс!
@@ -207,7 +258,7 @@ const Timer = ({ visible, onClose, habit, onSaveSession, sessions }) => {
 
               {sessions.length > 0 && (
                 <TouchableOpacity 
-                  style={styles.graphButton} 
+                  style={[styles.button, styles.graphButton]} 
                   onPress={() => setShowGraph(true)}
                 >
                   <Text style={styles.buttonText}>Показать график</Text>
@@ -224,19 +275,12 @@ const Timer = ({ visible, onClose, habit, onSaveSession, sessions }) => {
               >
                 <Text style={styles.buttonText}>Вернуться к таймеру</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.button, styles.exitButton]} 
-                onPress={onClose}
-              >
-                <Text style={styles.buttonText}>Выйти</Text>
-              </TouchableOpacity>
             </>
           )}
 
           {!showGraph && (
             <TouchableOpacity 
-              style={styles.closeButton} 
+              style={[styles.button, styles.closeButton]} 
               onPress={onClose}
             >
               <Text style={styles.buttonText}>Закрыть</Text>
@@ -256,26 +300,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 10,
+    backgroundColor: COLORS.background,
+    padding: 25,
+    borderRadius: 20,
     width: '90%',
-    maxHeight: '80%',
+    maxHeight: '90%',
     alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   habitName: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
+    color: COLORS.text,
     marginBottom: 20,
+    textAlign: 'center',
   },
   timerText: {
-    fontSize: 48,
+    fontSize: 64,
     fontWeight: 'bold',
+    color: COLORS.primary,
     marginBottom: 20,
+    fontFamily: 'System',
   },
   motivationalText: {
     fontSize: 16,
-    color: '#4CAF50',
+    color: COLORS.success,
     marginBottom: 20,
     textAlign: 'center',
     fontWeight: '500',
@@ -283,55 +336,54 @@ const styles = StyleSheet.create({
   button: {
     paddingHorizontal: 30,
     paddingVertical: 15,
-    borderRadius: 25,
+    borderRadius: 30,
     marginVertical: 10,
-    minWidth: 150,
+    minWidth: 200,
     alignItems: 'center',
-  },
-  startButton: {
-    backgroundColor: '#4CAF50',
-  },
-  stopButton: {
-    backgroundColor: '#f44336',
-  },
-  backButton: {
-    backgroundColor: '#2196F3',
-  },
-  exitButton: {
-    backgroundColor: '#f44336',
-  },
-  graphButton: {
-    backgroundColor: '#2196F3',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 25,
-    marginVertical: 10,
-    minWidth: 150,
-    alignItems: 'center',
-  },
-  closeButton: {
-    backgroundColor: '#757575',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 25,
-    marginVertical: 10,
-    minWidth: 150,
-    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   buttonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
+  },
+  startButton: {
+    backgroundColor: COLORS.primary,
+  },
+  stopButton: {
+    backgroundColor: COLORS.error,
+  },
+  graphButton: {
+    backgroundColor: COLORS.secondary,
+  },
+  backButton: {
+    backgroundColor: COLORS.primary,
+  },
+  closeButton: {
+    backgroundColor: COLORS.secondary,
+    marginTop: 10,
   },
   graphContainer: {
     marginVertical: 20,
-    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    borderRadius: 15,
+    padding: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2.84,
   },
   singleSessionMessage: {
-    marginTop: 10,
+    marginTop: 15,
     textAlign: 'center',
-    color: '#666',
+    color: COLORS.secondary,
     fontSize: 14,
+    fontStyle: 'italic',
   },
 });
 

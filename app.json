@@ -11,7 +11,10 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -24,7 +27,9 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.yourname.habittracker",
-      "permissions": ["NOTIFICATIONS"]
+      "permissions": [
+        "NOTIFICATIONS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -33,6 +38,11 @@
       [
         "expo-notifications"
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ed69b831-a59d-4e48-9646-1d1a4fd5f710"
+      }
+    }
   }
 }
